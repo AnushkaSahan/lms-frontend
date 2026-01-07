@@ -1,288 +1,543 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import {
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  X,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  UserPlus,
+  Filter,
+  User,
+} from "lucide-react";
+
+// --- STYLES ---
+const styles = {
+  container: { padding: "32px", backgroundColor: "#f8fafc", minHeight: "100%" },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "24px",
+  },
+  titleSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  title: { fontSize: "24px", fontWeight: "700", color: "#1e293b", margin: 0 },
+  subtitle: { fontSize: "14px", color: "#64748b" },
+
+  // Search & Filter Bar
+  controls: {
+    display: "flex",
+    gap: "16px",
+    marginBottom: "24px",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  searchWrapper: {
+    position: "relative",
+    flex: 1,
+    minWidth: "300px",
+  },
+  searchIcon: {
+    position: "absolute",
+    left: "12px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    color: "#94a3b8",
+  },
+  searchInput: {
+    width: "100%",
+    padding: "10px 40px",
+    borderRadius: "10px",
+    border: "1px solid #e2e8f0",
+    fontSize: "14px",
+    outline: "none",
+    transition: "all 0.2s",
+  },
+  clearBtn: {
+    position: "absolute",
+    right: "12px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    background: "none",
+    border: "none",
+    color: "#94a3b8",
+    cursor: "pointer",
+  },
+
+  // Table Styling
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    overflow: "hidden",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+  },
+  table: { width: "100%", borderCollapse: "collapse", textAlign: "left" },
+  th: {
+    padding: "16px",
+    backgroundColor: "#f8fafc",
+    borderBottom: "1px solid #e2e8f0",
+    fontSize: "12px",
+    fontWeight: "600",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+  td: {
+    padding: "16px",
+    borderBottom: "1px solid #f1f5f9",
+    fontSize: "14px",
+    color: "#334155",
+  },
+  actionBtn: (type) => ({
+    padding: "8px",
+    borderRadius: "6px",
+    border: "none",
+    cursor: "pointer",
+    marginRight: "8px",
+    backgroundColor: type === "edit" ? "#eff6ff" : "#fef2f2",
+    color: type === "edit" ? "#3b82f6" : "#ef4444",
+    transition: "all 0.2s",
+  }),
+
+  // Pagination
+  pagination: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 24px",
+    borderTop: "1px solid #e2e8f0",
+  },
+  pageBtn: (disabled) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+    backgroundColor: "#fff",
+    color: disabled ? "#cbd5e1" : "#64748b",
+    cursor: disabled ? "not-allowed" : "pointer",
+    fontSize: "13px",
+  }),
+
+  // Modal
+  overlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    backdropFilter: "blur(4px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+  },
+  modal: {
+    backgroundColor: "#fff",
+    borderRadius: "16px",
+    width: "100%",
+    maxWidth: "480px",
+    padding: "32px",
+    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+  },
+};
 
 function LecturersManagement({ api }) {
-    const [lecturers, setLecturers] = useState([]);
-    const [allLecturers, setAllLecturers] = useState([]); // Store all lecturers for filtering
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-    const [showModal, setShowModal] = useState(false);
-    const [editingLecturer, setEditingLecturer] = useState(null);
-    const [formData, setFormData] = useState({
-        fullName: '',
-        email: '',
-        department: ''
-    });
+  const [lecturers, setLecturers] = useState([]);
+  const [allLecturers, setAllLecturers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [editingLecturer, setEditingLecturer] = useState(null);
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    department: "",
+  });
 
-    // Debounce search term
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-        }, 500);
+  const itemsPerPage = 10;
 
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-    // Load lecturers initially
-    useEffect(() => {
-        loadLecturersFromAPI();
-    }, []);
+  useEffect(() => {
+    loadLecturersFromAPI();
+  }, []);
 
-    // Filter lecturers when search term changes
-    useEffect(() => {
-        filterLecturers();
-    }, [debouncedSearchTerm, allLecturers]);
+  useEffect(() => {
+    filterAndPaginateLecturers();
+  }, [debouncedSearchTerm, currentPage, allLecturers]);
 
-    // Fetch all lecturers from API
-    const loadLecturersFromAPI = async () => {
-        setLoading(true);
-        try {
-            // Fetch all lecturers without search parameter
-            const data = await api.getLecturers();
-            const lecturersList = data || [];
-            setAllLecturers(lecturersList);
-        } catch (error) {
-            console.error('Error loading lecturers:', error);
-            setAllLecturers([]);
-        }
-        setLoading(false);
-    };
+  const loadLecturersFromAPI = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getLecturers();
+      const list = data || [];
+      setAllLecturers(list);
+    } catch (error) {
+      console.error("Error loading lecturers:", error);
+      setAllLecturers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Client-side filtering
-    const filterLecturers = () => {
-        if (!debouncedSearchTerm.trim()) {
-            // No search term, show all lecturers
-            setLecturers(allLecturers);
-        } else {
-            // Apply search filter
-            const searchLower = debouncedSearchTerm.toLowerCase().trim();
-            const filteredLecturers = allLecturers.filter(lecturer =>
-                lecturer.fullName?.toLowerCase().includes(searchLower) ||
-                lecturer.email?.toLowerCase().includes(searchLower) ||
-                lecturer.department?.toLowerCase().includes(searchLower)
-            );
-            setLecturers(filteredLecturers);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        if (e) e.preventDefault();
-        try {
-            if (editingLecturer) {
-                await api.updateLecturer(editingLecturer.id, formData);
-            } else {
-                await api.createLecturer(formData);
-            }
-            setShowModal(false);
-            setEditingLecturer(null);
-            setFormData({ fullName: '', email: '', department: '' });
-            // Reload data after create/update
-            loadLecturersFromAPI();
-        } catch (error) {
-            alert('Error saving lecturer: ' + error.message);
-        }
-    };
-
-    const handleEdit = (lecturer) => {
-        setEditingLecturer(lecturer);
-        setFormData({
-            fullName: lecturer.fullName,
-            email: lecturer.email,
-            department: lecturer.department
-        });
-        setShowModal(true);
-    };
-
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this lecturer?')) {
-            try {
-                await api.deleteLecturer(id);
-                // Reload data after delete
-                loadLecturersFromAPI();
-            } catch (error) {
-                alert('Error deleting lecturer: ' + error.message);
-            }
-        }
-    };
-
-    const handleSearchChange = (e) => {
-        setSearchTerm(e.target.value);
-    };
-
-    const handleClearSearch = () => {
-        setSearchTerm('');
-    };
-
-    const handleRefresh = () => {
-        loadLecturersFromAPI();
-    };
-
-    return (
-        <div className="management-container">
-            <div className="management-header">
-                <h1>Manage Lecturers</h1>
-                <div className="header-actions">
-
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => {
-                            setEditingLecturer(null);
-                            setFormData({ fullName: '', email: '', department: '' });
-                            setShowModal(true);
-                        }}
-                    >
-                        Add New Lecturer
-                    </button>
-                </div>
-            </div>
-
-            <div className="management-controls">
-                <div className="search-box">
-                    <input
-                        type="text"
-                        placeholder="Search lecturers by name, email or department..."
-                        value={searchTerm}
-                        onChange={handleSearchChange}
-                    />
-                    {searchTerm && (
-                        <button
-                            className="search-clear-btn"
-                            onClick={handleClearSearch}
-                            title="Clear search"
-                        >
-                            ✕
-                        </button>
-                    )}
-                </div>
-                {debouncedSearchTerm && (
-                    <div className="search-info">
-                        <span>Searching for: "{debouncedSearchTerm}"</span>
-                        {lecturers.length === 0 && !loading && (
-                            <span className="no-results"> - No results found</span>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {loading ? (
-                <div className="loading">Loading lecturers...</div>
-            ) : (
-                <div className="table-container">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Full Name</th>
-                                <th>Email</th>
-                                <th>Department</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {lecturers.length > 0 ? (
-                                lecturers.map(lecturer => (
-                                    <tr key={lecturer.id}>
-                                        <td>{lecturer.id}</td>
-                                        <td>{lecturer.fullName}</td>
-                                        <td>{lecturer.email}</td>
-                                        <td>{lecturer.department}</td>
-                                        <td>
-                                            <button
-                                                className="btn btn-sm btn-secondary"
-                                                onClick={() => handleEdit(lecturer)}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                className="btn btn-sm btn-danger"
-                                                onClick={() => handleDelete(lecturer.id)}
-                                            >
-                                                Delete
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="5" className="no-data">
-                                        {debouncedSearchTerm
-                                            ? `No lecturers found matching "${debouncedSearchTerm}"`
-                                            : 'No lecturers available'
-                                        }
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* Results Summary */}
-            {!loading && (
-                <div className="results-summary">
-                    <span>
-                        {debouncedSearchTerm
-                            ? `Showing ${lecturers.length} of ${allLecturers.length} lecturers`
-                            : `Total: ${lecturers.length} lecturers`
-                        }
-                    </span>
-                </div>
-            )}
-
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h3>{editingLecturer ? 'Edit Lecturer' : 'Add New Lecturer'}</h3>
-                            <button
-                                className="modal-close"
-                                onClick={() => setShowModal(false)}
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="modal-form">
-                            <div className="form-group">
-                                <label>Full Name</label>
-                                <input
-                                    type="text"
-                                    value={formData.fullName}
-                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Department</label>
-                                <input
-                                    type="text"
-                                    value={formData.department}
-                                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                    required
-                                />
-                            </div>
-                            <div className="modal-actions">
-                                <button onClick={() => setShowModal(false)} className="btn btn-secondary">
-                                    Cancel
-                                </button>
-                                <button onClick={handleSubmit} className="btn btn-primary">
-                                    {editingLecturer ? 'Update' : 'Create'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+  const filterAndPaginateLecturers = () => {
+    let filtered = allLecturers;
+    if (debouncedSearchTerm.trim()) {
+      const searchLower = debouncedSearchTerm.toLowerCase().trim();
+      filtered = allLecturers.filter(
+        (lecturer) =>
+          lecturer.fullName?.toLowerCase().includes(searchLower) ||
+          lecturer.email?.toLowerCase().includes(searchLower) ||
+          lecturer.department?.toLowerCase().includes(searchLower)
+      );
+    }
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    setLecturers(
+      filtered.slice(
+        currentPage * itemsPerPage,
+        (currentPage + 1) * itemsPerPage
+      )
     );
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingLecturer) {
+        await api.updateLecturer(editingLecturer.id, formData);
+      } else {
+        await api.createLecturer(formData);
+      }
+      setShowModal(false);
+      setEditingLecturer(null);
+      setFormData({ fullName: "", email: "", department: "" });
+      loadLecturersFromAPI();
+    } catch (error) {
+      alert("Error saving lecturer: " + error.message);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      {/* Header */}
+      <header style={styles.header}>
+        <div style={styles.titleSection}>
+          <h1 style={styles.title}>Lecturers Directory</h1>
+          <p style={styles.subtitle}>
+            Manage and monitor all academic staff members
+          </p>
+        </div>
+        <button
+          className="btn-primary-action"
+          onClick={() => {
+            setEditingLecturer(null);
+            setFormData({ fullName: "", email: "", department: "" });
+            setShowModal(true);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "10px 20px",
+            backgroundColor: "#3b82f6",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "600",
+          }}
+        >
+          <UserPlus size={18} /> Add Lecturer
+        </button>
+      </header>
+
+      {/* Controls */}
+      <div style={styles.controls}>
+        <div style={styles.searchWrapper}>
+          <Search size={18} style={styles.searchIcon} />
+          <input
+            style={styles.searchInput}
+            placeholder="Search by name, email, or department..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button style={styles.clearBtn} onClick={() => setSearchTerm("")}>
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={loadLecturersFromAPI}
+          style={{ ...styles.pageBtn(false), padding: "10px" }}
+        >
+          <RefreshCw size={18} className={loading ? "spin" : ""} />
+        </button>
+      </div>
+
+      {/* Data Table */}
+      <div style={styles.card}>
+        {loading ? (
+          <div
+            style={{ padding: "60px", textAlign: "center", color: "#64748b" }}
+          >
+            <RefreshCw
+              size={32}
+              className="spin"
+              style={{ marginBottom: "12px" }}
+            />
+            <p>Fetching lecturer records...</p>
+          </div>
+        ) : (
+          <>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Lecturer</th>
+                  <th style={styles.th}>Department</th>
+                  <th style={styles.th}>Email Address</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lecturers.length > 0 ? (
+                  lecturers.map((lecturer) => (
+                    <tr key={lecturer.id}>
+                      <td style={styles.td}>
+                        <div style={{ fontWeight: "600", color: "#1e293b" }}>
+                          {lecturer.fullName}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                          ID: {lecturer.id}
+                        </div>
+                      </td>
+                      <td style={styles.td}>
+                        <span
+                          style={{
+                            backgroundColor: "#f1f5f9",
+                            padding: "4px 8px",
+                            borderRadius: "4px",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {lecturer.department}
+                        </span>
+                      </td>
+                      <td style={styles.td}>{lecturer.email}</td>
+                      <td style={{ ...styles.td, textAlign: "right" }}>
+                        <button
+                          style={styles.actionBtn("edit")}
+                          onClick={() => {
+                            setEditingLecturer(lecturer);
+                            setFormData({ ...lecturer });
+                            setShowModal(true);
+                          }}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          style={styles.actionBtn("delete")}
+                          onClick={() => {
+                            if (window.confirm("Delete lecturer?"))
+                              api
+                                .deleteLecturer(lecturer.id)
+                                .then(loadLecturersFromAPI);
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan="4"
+                      style={{
+                        ...styles.td,
+                        textAlign: "center",
+                        padding: "48px",
+                        color: "#94a3b8",
+                      }}
+                    >
+                      {debouncedSearchTerm
+                        ? `No lecturers found matching "${debouncedSearchTerm}"`
+                        : "No lecturers available"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination Footer */}
+            <div style={styles.pagination}>
+              <div style={{ fontSize: "13px", color: "#64748b" }}>
+                Showing <b>{lecturers.length}</b> of{" "}
+                <b>{allLecturers.length}</b> records
+              </div>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
+                <button
+                  style={styles.pageBtn(currentPage === 0)}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  disabled={currentPage === 0}
+                >
+                  <ChevronLeft size={16} /> Previous
+                </button>
+                <span style={{ fontSize: "13px", color: "#64748b" }}>
+                  Page {currentPage + 1} of {totalPages || 1}
+                </span>
+                <button
+                  style={styles.pageBtn(currentPage >= totalPages - 1)}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={currentPage >= totalPages - 1}
+                >
+                  Next <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Form Modal */}
+      {showModal && (
+        <div style={styles.overlay}>
+          <div style={styles.modal}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "24px",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                {editingLecturer ? "Update Lecturer" : "Register New Lecturer"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setEditingLecturer(null);
+                  setFormData({ fullName: "", email: "", department: "" });
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <X size={20} color="#94a3b8" />
+              </button>
+            </div>
+            <form
+              onSubmit={handleSubmit}
+              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Full Name
+                </label>
+                <input
+                  style={styles.searchInput}
+                  value={formData.fullName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fullName: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  style={styles.searchInput}
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Department
+                </label>
+                <input
+                  style={styles.searchInput}
+                  value={formData.department}
+                  onChange={(e) =>
+                    setFormData({ ...formData, department: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <button
+                className="btn-primary-action"
+                type="submit"
+                style={{
+                  marginTop: "12px",
+                  padding: "12px",
+                  backgroundColor: "#3b82f6",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                }}
+              >
+                {editingLecturer ? "Save Changes" : "Complete Registration"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+                .spin { animation: spin 1s linear infinite; }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            `}</style>
+    </div>
+  );
 }
 
 export default LecturersManagement;
