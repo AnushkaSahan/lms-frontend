@@ -258,7 +258,18 @@ function AnnouncementsManagement({ api }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = JSON.parse(localStorage.getItem("user"));
+      // ✅ Get user or use default for development
+      let user = localStorage.getItem("user")
+        ? JSON.parse(localStorage.getItem("user"))
+        : null;
+
+      if (!user) {
+        // Development fallback
+        console.warn("No user found, using default test user");
+        user = { id: 1, role: "ADMIN" };
+        // Optionally save it for next time
+        localStorage.setItem("user", JSON.stringify(user));
+      }
 
       const announcementData = {
         title: formData.title.trim(),

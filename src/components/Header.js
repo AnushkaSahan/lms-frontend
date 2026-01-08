@@ -167,7 +167,7 @@ function Header({ user, onMenuClick }) {
               <User size={18} />
             )}
           </div>
-          <ChevronDown size={16} color="#94a3b8" />
+          {/* <ChevronDown size={16} color="#94a3b8" /> */}
         </div>
       </div>
     </header>
